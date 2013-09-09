@@ -1,6 +1,8 @@
 package indextank
 
 import (
+	"appengine"
+	"appengine/urlfetch"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -14,6 +16,7 @@ import (
 )
 
 const version = "0.3"
+const APP_ENGINE_USED = true
 const userAgent = "Searchify-Gotank/" + version
 
 func makeIndexUrl(apiUrl, name string) string {
@@ -25,6 +28,7 @@ func request(method, uri string, data interface{}) (*http.Response, error) {
 
 	var bodyReader io.Reader = nil
 	var contentLength int64 = 0
+	var httpClient *http.Client
 	if data != nil {
 		b, err := json.Marshal(data)
 		contentLength = int64(len(b))
@@ -41,14 +45,19 @@ func request(method, uri string, data interface{}) (*http.Response, error) {
 		return nil, err
 	}
 
+	if APP_ENGINE_USED {
+		context := appengine.NewContext(req)
+		httpClient = urlfetch.Client(context)
+	} else {
+		httpClient = http.DefaultClient
+	}
+
 	if method == "POST" || method == "PUT" || (method == "DELETE" && contentLength > 0) {
 		//fmt.Printf("Setting content-length to %d for %s %s\n", contentLength, method, uri)
 		req.Header.Set("Content-Type", "application/json")
 		req.ContentLength = contentLength
 	}
-
 	req.Header.Set("User-Agent", userAgent)
-	httpClient := http.DefaultClient
 	resp, err := httpClient.Do(req)
 	// make sure the caller calls resp.Body.Close() if necessary
 	return resp, err
